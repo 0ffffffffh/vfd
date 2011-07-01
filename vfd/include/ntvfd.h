@@ -3,6 +3,8 @@
 
 #include <ntifs.h>
 
+#define VFDINTERNAL
+
 #define VFD_DEVICE_NAME L"\\Device\\VfdDevController"
 #define VFD_ROOT_DIR_DEV L"\\Device\\VfdDevRoot"
 #define VFD_VDISK_DEV_FORMAT VFD_ROOT_DIR_DEV L"\\vdisk%d"

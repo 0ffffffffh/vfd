@@ -75,7 +75,7 @@ NTSTATUS MemAllocatePagedPoolEx(
 	return STATUS_SUCCESS;
 }
 
-VOID MemFreeMemory(
+VOID MemFreePoolMemory(
 	__in PVOID Mem
 	)
 {

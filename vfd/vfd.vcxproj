@@ -102,6 +102,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="khelper\irpqueue.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="memory\memory.c" />
     <ClCompile Include="memory\memvalid.c" />
@@ -109,6 +110,7 @@
     <ClCompile Include="vdisk\vdisk.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\irpqueue.h" />
     <ClInclude Include="include\memory.h" />
     <ClInclude Include="include\mntmgr.h" />
     <ClInclude Include="include\ntvfd.h" />

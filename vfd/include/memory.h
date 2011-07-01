@@ -25,7 +25,7 @@ NTSTATUS MemAllocatePagedPoolEx(
 	__out PMDL *Mdl
 	);
 
-VOID MemFreeMemory(
+VOID MemFreePoolMemory(
 	__in PVOID Mem
 	);
 

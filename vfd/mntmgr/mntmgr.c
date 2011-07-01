@@ -1,8 +1,11 @@
 #include "..\include\mntmgr.h"
 #include "..\include\vdisk.h"
+#include "..\include\memory.h"
 
 KMUTEX MntGeneralMountLock;
 PDRIVER_OBJECT MntDriverObject;
+ULONG MntDeviceCount=0;
+SINGLE_LIST_ENTRY MntDiskList;
 
 typedef struct _VDISK_LIST_ENTRY
 {
@@ -18,8 +21,52 @@ VOID MntRegisterDiskDeviceObject(
 	__in PVDISK_OBJECT Vdisk
 	)
 {
-	NOTIMPLEMENTED();
+	NTSTATUS Status;
+	PVDISK_LIST_ENTRY ListEntry = NULL;
+	
+	Status = MemAllocateNonPagedPool(sizeof(VDISK_LIST_ENTRY),&ListEntry);
+
+	ListEntry->VDisk = Vdisk;
+
+	if (!NT_SUCCESS(Status))
+	{
+		NTFAILMSG(Status);
+		return;
+	}
+
+	PushEntryList(&MntDiskList,&ListEntry->Entry);
 }
+
+BOOLEAN MntDeRegisterDiskDeviceObject(
+	__in ULONG DeviceId
+	)
+{
+	return FALSE;
+}
+
+PVDISK_OBJECT MntGetDeviceById(
+	__in ULONG DeviceId
+	)
+{
+	SINGLE_LIST_ENTRY *Node;
+	PVDISK_OBJECT DiskObj;
+
+	if (MntDiskList.Next == NULL)
+		return NULL;
+
+	for (Node = MntDiskList.Next; Node != NULL ; Node = Node->Next)
+	{
+		DiskObj = CONTAINING_RECORD(Node,VDISK_LIST_ENTRY,Entry)->VDisk;
+
+		if (DiskObj->DeviceId == DeviceId)
+			return DiskObj;
+	}
+
+	return NULL;
+}
+
+#define MntGetNextDeviceIdentifier() (MntDeviceCount + 1)
+#define MntPrepareNextDeviceId() (++MntDeviceCount)
 
 NTSTATUS MntInitializeMountMgr(
 	__in PDRIVER_OBJECT DriverObject
@@ -52,18 +99,22 @@ NTSTATUS MntMountDisk(
 	)
 {
 	NTSTATUS Status;
-
+	ULONG DevId;
 	PVDISK_OBJECT DiskObj;
 
 	MntAcquireGeneralLock();
 
-	Status = VdiAllocateVirtualDisk(MntDriverObject,0,DiskLength,&DiskObj);
+	DevId = MntGetNextDeviceIdentifier();
+
+	Status = VdiAllocateVirtualDisk(MntDriverObject,DevId,DiskLength,&DiskObj);
 
 	if (!NT_SUCCESS(Status))
 	{
 		Status = STATUS_UNSUCCESSFUL;
 		goto Exit;
 	}
+
+	MntPrepareNextDeviceId();
 
 	MntRegisterDiskDeviceObject(DiskObj);
 
@@ -94,11 +145,25 @@ NTSTATUS MntDispatchDiskIrp(
 	__in PIRP Irp
 	)
 {
+	NTSTATUS Status;
+	PVDISK_OBJECT Disk;
 	MntAcquireGeneralLock();
 
-	NOTIMPLEMENTED();
+	Disk = MntGetDeviceById(((PDEVICE_EXTENSION_DATA)DeviceInfo)->DeviceId);
+
+	if (Disk == NULL)
+	{
+		Status = STATUS_DEVICE_DOES_NOT_EXIST;
+		Irp->IoStatus.Status = Status;
+		Irp->IoStatus.Information = 0;
+		IofCompleteRequest(Irp,IO_NO_INCREMENT);
+		MntReleaseGeneralLock();
+		return Status;
+	}
 
 	MntReleaseGeneralLock();
 
-	return STATUS_NOT_IMPLEMENTED;
+	Status = VdiDispatchDiskIrp(Disk,Irp);
+
+	return Status;
 }
