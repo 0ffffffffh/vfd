@@ -60,8 +60,6 @@ VFDINTERNAL BOOLEAN _MntDeRegisterDiskDeviceObject(
 
 	RemoveEntryList(Node);
 
-	VdiFreeVirtualDisk(Entry->VDisk);
-
 	MemFreePoolMemory(Entry);
 
 	return TRUE;
@@ -75,28 +73,6 @@ VFDINTERNAL BOOLEAN MntDeRegisterDiskDeviceObject(
 		return FALSE;
 
 	return _MntDeRegisterDiskDeviceObject(DiskDev->ContainedNode);
-}
-
-VFDINTERNAL BOOLEAN MntDeRegisterAllDiskDeviceObjects(
-	)
-{
-	LIST_ENTRY *Node = MntDiskList.Blink,*Temp;
-	BOOLEAN Success;
-
-	while (Node != NULL)
-	{
-		Temp = Node->Blink;
-		
-		if (!_MntDeRegisterDiskDeviceObject(Node)) 
-		{
-			NTFAILMSGEX(STATUS_UNSUCCESSFUL,"Deregistering failed for node=0x%p",Node);
-			Success = FALSE;
-		}
-
-		Node = Temp;
-	}
-
-	return Success;
 }
 
 VFDINTERNAL PLIST_ENTRY MntGetDeviceNodeById(
@@ -168,23 +144,25 @@ NTSTATUS MntInitializeMountMgr(
 NTSTATUS MntUninitializeMountMgr(
 	)
 {
-	LIST_ENTRY *Node;
-	PVDISK_OBJECT Disk;
+	LIST_ENTRY *Node, *Temp;
+	BOOLEAN Success;
 
 	if (IsListEmpty(&MntDiskList))
 		return STATUS_UNSUCCESSFUL;
 
+
 	MntAcquireGeneralLock();
+
+	Node = MntDiskList.Blink;
 
 	if (MntDriverObject != NULL)
 	{
-		for (Node = MntDiskList.Flink; Node != NULL ; Node = Node->Flink)
+		while (Node != NULL)
 		{
-			Disk = CONTAINING_RECORD(Node,VDISK_LIST_ENTRY,Entry)->VDisk;
-			_MntUnmountDisk(Disk);
+			Temp = Node->Blink;
+			_MntUnmountDisk(CONTAINING_RECORD(Node,VDISK_LIST_ENTRY,Entry)->VDisk);
+			Node = Temp;
 		}
-
-		MntDeRegisterAllDiskDeviceObjects();
 	}
 
 	MntReleaseGeneralLock();
