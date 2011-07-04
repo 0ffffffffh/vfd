@@ -53,8 +53,6 @@ VFDINTERNAL NTSTATUS VdiGetIoParametersFromIrp(
 	
 	IoStack = IoGetCurrentIrpStackLocation(Irp);
 	
-
-
 	switch (IoStack->MajorFunction)
 	{
 	case IRP_MJ_WRITE:
@@ -128,6 +126,25 @@ VFDINTERNAL NTSTATUS VdiDispatchVdiskDeviceRequest(
 	return Status;
 }
 
+VFDINTERNAL VOID VdiCompleteAllPendingIrps(
+	__in PVDISK_OBJECT Vdisk
+	)
+{
+	PIRP PendingIrp;
+
+	if (IqIsIrpQueueEmpty(&Vdisk->VdevIrpQueue))
+		return;
+
+	while (IqDequeueIrp(&Vdisk->VdevIrpQueue,&PendingIrp))
+	{
+		PendingIrp->IoStatus.Status = STATUS_SUCCESS;
+		PendingIrp->IoStatus.Information = 0;
+
+		IofCompleteRequest(PendingIrp,IO_NO_INCREMENT);
+	}
+
+}
+
 NTSTATUS VdiAllocateVirtualDisk(
 	__in PDRIVER_OBJECT Controller,
 	__in ULONG DeviceId,
@@ -178,6 +195,13 @@ NTSTATUS VdiAllocateVirtualDisk(
 	DevObj->Flags &= ~DO_DEVICE_INITIALIZING;
 
 	return STATUS_SUCCESS;
+}
+
+NTSTATUS VdiFreeVirtualDisk(
+	__in PVDISK_OBJECT DiskObj
+	)
+{
+	VdiCompleteAllPendingIrps(DiskObj);
 }
 
 

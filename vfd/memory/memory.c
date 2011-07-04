@@ -56,8 +56,6 @@ NTSTATUS MemAllocatePagedPoolEx(
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 
-		 MmBuildMdlForNonPagedPool(mdl);
-
 		__try
 		{
 			MmProbeAndLockPages(mdl,KernelMode,IoModifyAccess);

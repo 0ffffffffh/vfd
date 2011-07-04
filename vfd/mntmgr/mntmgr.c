@@ -5,19 +5,27 @@
 KMUTEX MntGeneralMountLock;
 PDRIVER_OBJECT MntDriverObject;
 ULONG MntDeviceCount=0;
-SINGLE_LIST_ENTRY MntDiskList;
+LIST_ENTRY MntDiskList;
 
 typedef struct _VDISK_LIST_ENTRY
 {
-	SINGLE_LIST_ENTRY Entry;
+	LIST_ENTRY Entry;
 	PVDISK_OBJECT VDisk;
 }VDISK_LIST_ENTRY,*PVDISK_LIST_ENTRY;
+
+
 
 #define MntAcquireGeneralLock() KeWaitForSingleObject(&MntGeneralMountLock,Executive,KernelMode,FALSE,NULL)
 
 #define MntReleaseGeneralLock() KeReleaseMutex(&MntGeneralMountLock,FALSE)
 
-VOID MntRegisterDiskDeviceObject(
+#define MntIsRegistered(Vdisk) \
+{ \
+	((BOOLEAN)Vdisk->ContainedNode != NULL); \
+} \
+
+
+VFDINTERNAL VOID MntRegisterDiskDeviceObject(
 	__in PVDISK_OBJECT Vdisk
 	)
 {
@@ -25,7 +33,7 @@ VOID MntRegisterDiskDeviceObject(
 	PVDISK_LIST_ENTRY ListEntry = NULL;
 	
 	Status = MemAllocateNonPagedPool(sizeof(VDISK_LIST_ENTRY),&ListEntry);
-
+	
 	ListEntry->VDisk = Vdisk;
 
 	if (!NT_SUCCESS(Status))
@@ -33,37 +41,99 @@ VOID MntRegisterDiskDeviceObject(
 		NTFAILMSG(Status);
 		return;
 	}
-
-	PushEntryList(&MntDiskList,&ListEntry->Entry);
+	
+	InsertTailList(&MntDiskList,&(ListEntry->Entry));
+	
+	Vdisk->ContainedNode = &ListEntry->Entry;	
 }
 
-BOOLEAN MntDeRegisterDiskDeviceObject(
+VFDINTERNAL BOOLEAN _MntDeRegisterDiskDeviceObject(
+	__in PLIST_ENTRY Node
+	)
+{
+	PVDISK_LIST_ENTRY Entry;
+
+	if (Node == NULL)
+		return FALSE;
+
+	Entry = CONTAINING_RECORD(Node,VDISK_LIST_ENTRY,Entry);
+
+	RemoveEntryList(Node);
+
+	VdiFreeVirtualDisk(Entry->VDisk);
+
+	MemFreePoolMemory(Entry);
+
+	return TRUE;
+}
+
+VFDINTERNAL BOOLEAN MntDeRegisterDiskDeviceObject(
+	__in PVDISK_OBJECT DiskDev
+	)
+{
+	if (DiskDev == NULL)
+		return FALSE;
+
+	return _MntDeRegisterDiskDeviceObject(DiskDev->ContainedNode);
+}
+
+VFDINTERNAL BOOLEAN MntDeRegisterAllDiskDeviceObjects(
+	)
+{
+	LIST_ENTRY *Node = MntDiskList.Blink,*Temp;
+	BOOLEAN Success;
+
+	while (Node != NULL)
+	{
+		Temp = Node->Blink;
+		
+		if (!_MntDeRegisterDiskDeviceObject(Node)) 
+		{
+			NTFAILMSGEX(STATUS_UNSUCCESSFUL,"Deregistering failed for node=0x%p",Node);
+			Success = FALSE;
+		}
+
+		Node = Temp;
+	}
+
+	return Success;
+}
+
+VFDINTERNAL PLIST_ENTRY MntGetDeviceNodeById(
 	__in ULONG DeviceId
 	)
 {
-	return FALSE;
-}
+	LIST_ENTRY *Node;
 
-PVDISK_OBJECT MntGetDeviceById(
-	__in ULONG DeviceId
-	)
-{
-	SINGLE_LIST_ENTRY *Node;
-	PVDISK_OBJECT DiskObj;
-
-	if (MntDiskList.Next == NULL)
+	if (IsListEmpty(&MntDiskList))
 		return NULL;
 
-	for (Node = MntDiskList.Next; Node != NULL ; Node = Node->Next)
+	for (Node = MntDiskList.Flink; Node != NULL; Node = Node->Flink)
 	{
-		DiskObj = CONTAINING_RECORD(Node,VDISK_LIST_ENTRY,Entry)->VDisk;
-
-		if (DiskObj->DeviceId == DeviceId)
-			return DiskObj;
+		if (CONTAINING_RECORD(Node,VDISK_LIST_ENTRY,Entry)->VDisk->DeviceId == DeviceId)
+			return Node;
 	}
 
 	return NULL;
 }
+
+VFDINTERNAL PVDISK_OBJECT MntGetDeviceById(
+	__in ULONG DeviceId
+	)
+{
+	LIST_ENTRY *Node;
+
+	Node = MntGetDeviceNodeById(DeviceId);
+
+	if (!Node)
+		return NULL;
+
+	return CONTAINING_RECORD(Node,VDISK_LIST_ENTRY,Entry)->VDisk;
+}
+
+VFDINTERNAL NTSTATUS FASTCALL _MntUnmountDisk(
+	__in PVDISK_OBJECT Disk
+	);
 
 #define MntGetNextDeviceIdentifier() (MntDeviceCount + 1)
 #define MntPrepareNextDeviceId() (++MntDeviceCount)
@@ -79,6 +149,8 @@ NTSTATUS MntInitializeMountMgr(
 
 	KeInitializeMutex(&MntGeneralMountLock,0);
 	
+	InitializeListHead(&MntDiskList);
+
 	RtlInitUnicodeString(&DevDirName,VFD_ROOT_DIR_DEV);
 
 	InitializeObjectAttributes(&ObjAttrib,&DevDirName,OBJ_OPENIF,NULL,NULL);
@@ -92,6 +164,34 @@ NTSTATUS MntInitializeMountMgr(
 
 	return STATUS_SUCCESS;
 }
+
+NTSTATUS MntUninitializeMountMgr(
+	)
+{
+	LIST_ENTRY *Node;
+	PVDISK_OBJECT Disk;
+
+	if (IsListEmpty(&MntDiskList))
+		return STATUS_UNSUCCESSFUL;
+
+	MntAcquireGeneralLock();
+
+	if (MntDriverObject != NULL)
+	{
+		for (Node = MntDiskList.Flink; Node != NULL ; Node = Node->Flink)
+		{
+			Disk = CONTAINING_RECORD(Node,VDISK_LIST_ENTRY,Entry)->VDisk;
+			_MntUnmountDisk(Disk);
+		}
+
+		MntDeRegisterAllDiskDeviceObjects();
+	}
+
+	MntReleaseGeneralLock();
+
+	return STATUS_UNSUCCESSFUL;
+}
+
 
 NTSTATUS MntMountDisk(
 	__in ULONG64 DiskLength,
@@ -127,17 +227,33 @@ Exit:
 	return Status;
 }
 
+VFDINTERNAL NTSTATUS FASTCALL _MntUnmountDisk(
+	__in PVDISK_OBJECT Disk
+	)
+{
+	if (Disk == NULL)
+		return STATUS_DEVICE_DOES_NOT_EXIST;
+
+	MntDeRegisterDiskDeviceObject(Disk);
+
+	return VdiFreeVirtualDisk(Disk);
+}
+
 NTSTATUS MntUnmountDisk(
 	__in ULONG VdiskId
 	)
 {
+	NTSTATUS Status;
+	PVDISK_OBJECT Disk;
 	MntAcquireGeneralLock();
 
-	NOTIMPLEMENTED();
+	Disk = MntGetDeviceById(VdiskId);
+	
+	Status = _MntUnmountDisk(Disk);
 
 	MntReleaseGeneralLock();
 
-	return STATUS_NOT_IMPLEMENTED;
+	return Status;
 }
 
 NTSTATUS MntDispatchDiskIrp(

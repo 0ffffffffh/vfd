@@ -4,6 +4,9 @@ NTSTATUS MntInitializeMountMgr(
 	__in PDRIVER_OBJECT DriverObject
 	);
 
+NTSTATUS MntUninitializeMountMgr(
+	);
+
 NTSTATUS MntMountDisk(
 	__in ULONG64 DiskLength,
 	__out PULONG VdiskId

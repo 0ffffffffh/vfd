@@ -75,7 +75,7 @@ BOOLEAN IqDequeueIrp(
 	PIRPQUEUE_NODE DeqNode;
 	PIRP DeqIrp;
 
-	if (Queue->First == NULL)
+	if (Queue->Count == 0)
 		return FALSE;
 
 	DeqNode = Queue->First;

@@ -3,6 +3,10 @@
 
 #include "ntvfd.h"
 
+#define IqGetIrpQueueCount(IrpQueue) ((IrpQueue)->Count)
+
+#define IqIsIrpQueueEmpty(IrpQueue) (((IrpQueue)->Count) == 0)
+
 typedef struct _IRPQUEUE_NODE
 {
 	struct _IRPQUEUE_NODE *Back;
@@ -40,6 +44,8 @@ BOOLEAN IqDequeueIrp(
 	__in PIRPQUEUE Queue,
 	__out PIRP *Irp
 	);
+
+
 
 NTSTATUS IqWaitUntilQueueIsNotEmpty(
 	__in PIRPQUEUE Queue
