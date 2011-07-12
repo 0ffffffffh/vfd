@@ -80,4 +80,17 @@ VOID MemFreePoolMemory(
 	ExFreePoolWithTag(Mem,VFD_POOL_TAG);
 }
 
+VOID MemFreePoolMemoryForMdl(
+	__in PMDL Mem
+	)
+{
+	PVOID PagedMem;
+
+	PagedMem = MmGetMdlVirtualAddress(Mem);
+	
+	if (Mem->MdlFlags & MDL_PAGES_LOCKED)
+		MmUnlockPages(Mem);
+
+	ExFreePoolWithTag(PagedMem,VFD_POOL_TAG);
+}
 

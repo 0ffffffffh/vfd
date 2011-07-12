@@ -107,6 +107,7 @@
     <ClCompile Include="memory\memory.c" />
     <ClCompile Include="memory\memvalid.c" />
     <ClCompile Include="mntmgr\mntmgr.c" />
+    <ClCompile Include="vdisk\vdisup.c" />
     <ClCompile Include="vdisk\vdisk.c" />
   </ItemGroup>
   <ItemGroup>
@@ -115,6 +116,7 @@
     <ClInclude Include="include\mntmgr.h" />
     <ClInclude Include="include\ntvfd.h" />
     <ClInclude Include="include\vdisk.h" />
+    <ClInclude Include="include\vdskntrnl.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

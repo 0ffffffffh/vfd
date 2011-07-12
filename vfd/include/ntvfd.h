@@ -27,9 +27,11 @@
 } \
 
 
+
 typedef struct _DEVICE_EXTENSION_DATA
 {
 	ULONG DeviceId;
 }DEVICE_EXTENSION_DATA,*PDEVICE_EXTENSION_DATA;
+
 
 #endif //__NTVFD_H__

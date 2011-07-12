@@ -29,6 +29,9 @@ VOID MemFreePoolMemory(
 	__in PVOID Mem
 	);
 
+VOID MemFreePoolMemoryForMdl(
+	__in PMDL Mem
+	);
 
 //MEMORY VALIDATORS
 

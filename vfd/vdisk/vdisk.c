@@ -1,15 +1,10 @@
 #include "..\include\vdisk.h"
+#include "..\include\vdskntrnl.h"
 #include "..\include\memory.h"
 #include "..\include\irpqueue.h"
 #include <ntstrsafe.h>
+#include <ntdddisk.h>
 
-typedef struct _IOPARAMETER
-{
-	UCHAR Major;
-	ULONG Length;
-	ULONG64 Offset;
-	PUCHAR IoBuffer;
-}IOPARAMETER,*PIOPARAMETER;
 
 #define VdiInitializeVDiskItem(p,d,i,s) \
 { \
@@ -17,6 +12,25 @@ typedef struct _IOPARAMETER
 	(p)->DeviceId = i; \
 	(p)->VdevSize = s; \
 } \
+
+//FORWARDED ROUTINES BEGIN
+
+VFDINTERNAL FORCEINLINE NTSTATUS VdisCheckBufferSize(
+	__in ULONG IncomingSize,
+	__in ULONG Required,
+	__in PIO_STATUS_BLOCK IoStatus);
+
+VFDINTERNAL NTSTATUS VdisGetIoParametersFromIrp(
+	__in PIRP Irp,
+	__out PIOPARAMETER Param
+	);
+
+
+//FORWARDED ROUTINES END
+
+#define VdiGetIoCtlCodeFromIoParam(IoParam) ((ULONG)((IoParam)->Reserved.r0))
+#define VdiGetIoCtlInputSizeFromIoParam(IoParam) ((ULONG)((IoParam)->Length))
+#define VdiGetIoCtlOutputSizeFromIoParam(IoParam) ((ULONG)((IoParam)->Reserved.r1))
 
 
 VFDINTERNAL NTSTATUS VdiAllocateVDiskItem(
@@ -33,44 +47,14 @@ VFDINTERNAL NTSTATUS VdiAllocateVDiskItem(
 	return STATUS_SUCCESS;
 }
 
-VFDINTERNAL NTSTATUS VdiGetIoParametersFromIrp(
-	__in PIRP Irp,
-	__out PIOPARAMETER Param
+VFDINTERNAL NTSTATUS VdiFreeVDiskItem(
+	__in PVDISK_OBJECT VdiskObj
 	)
 {
-	PIO_STACK_LOCATION IoStack = NULL;
-	struct 
-	{
-		ULONG Length;
-		ULONG POINTER_ALIGNMENT Key;
-		LARGE_INTEGER ByteOffset;
-	}*IoOp = NULL;
-
-	if (Param == NULL)
+	if (VdiskObj == NULL)
 		return STATUS_UNSUCCESSFUL;
 
-	RtlZeroMemory(Param,sizeof(IOPARAMETER));
-	
-	IoStack = IoGetCurrentIrpStackLocation(Irp);
-	
-	switch (IoStack->MajorFunction)
-	{
-	case IRP_MJ_WRITE:
-		IoOp = &IoStack->Parameters.Write;
-		break;
-	case IRP_MJ_READ:
-		IoOp = &IoStack->Parameters.Read;
-		break;
-	default:
-		Param->IoBuffer = (PUCHAR)Irp->AssociatedIrp.SystemBuffer;
-		return STATUS_SUCCESS;
-	}
-
-
-	Param->Major = IoStack->MajorFunction;
-	Param->IoBuffer = (PUCHAR)MmGetSystemAddressForMdlSafe(Irp->MdlAddress,NormalPagePriority);
-	Param->Length = IoOp->Length;
-	Param->Offset = IoOp->ByteOffset.QuadPart;
+	MemFreePoolMemory(VdiskObj);
 
 	return STATUS_SUCCESS;
 }
@@ -81,8 +65,47 @@ VFDINTERNAL NTSTATUS VdiHandleVdiskDeviceDevIo(
 	__out PIO_STATUS_BLOCK IrpStatus
 	)
 {
-	NOTIMPLEMENTED();
-	return STATUS_NOT_IMPLEMENTED;
+	ULONG CtlCode = VdiGetIoCtlCodeFromIoParam(IoParam);
+	ULONG OutBuffSize = 0,InpBuffSize=0;
+	NTSTATUS Status;
+
+	Status = STATUS_SUCCESS;
+
+	switch (CtlCode)
+	{
+	case IOCTL_DISK_IS_WRITABLE:
+		{
+			IrpStatus->Status = STATUS_SUCCESS;
+			IrpStatus->Information = 0;
+		}
+		break;
+	case IOCTL_DISK_CHECK_VERIFY:
+	case IOCTL_STORAGE_CHECK_VERIFY:
+	case IOCTL_STORAGE_CHECK_VERIFY2:
+		{
+		}
+		break;
+	case IOCTL_DISK_GET_DRIVE_GEOMETRY:
+		{
+			if (!NT_SUCCESS(VdisCheckBufferSize(OutBuffSize,sizeof(DISK_GEOMETRY),IrpStatus)))
+				break;
+		}
+		break;
+	case IOCTL_DISK_GET_LENGTH_INFO:
+		{
+		}
+		break;
+	case IOCTL_DISK_GET_DRIVE_LAYOUT:
+		{
+			if (!NT_SUCCESS(VdisCheckBufferSize(OutBuffSize,sizeof(DRIVE_LAYOUT_INFORMATION),IrpStatus)))
+				break;
+
+
+		}
+		break;
+	}
+
+	return Status;
 }
 
 VFDINTERNAL NTSTATUS VdiDispatchVdiskDeviceRequest(
@@ -105,7 +128,7 @@ VFDINTERNAL NTSTATUS VdiDispatchVdiskDeviceRequest(
 		break;
 	case IRP_MJ_DEVICE_CONTROL:
 		{
-			Status = VdiGetIoParametersFromIrp(Irp,&IoParam);
+			Status = VdisGetIoParametersFromIrp(Irp,&IoParam);
 
 			if (!NT_SUCCESS(Status))
 				return Status;
@@ -202,6 +225,8 @@ NTSTATUS VdiFreeVirtualDisk(
 	)
 {
 	VdiCompleteAllPendingIrps(DiskObj);
+	IoDeleteDevice(DiskObj->VdevOb);
+	return VdiFreeVDiskItem(DiskObj);
 }
 
 
@@ -213,7 +238,7 @@ NTSTATUS VdiDispatchDiskIrp(
 	NTSTATUS Status;
 	IOPARAMETER IoParam;
 
-	Status = VdiGetIoParametersFromIrp(Irp,&IoParam);
+	Status = VdisGetIoParametersFromIrp(Irp,&IoParam);
 
 	if (!NT_SUCCESS(Status))
 		return Status;
