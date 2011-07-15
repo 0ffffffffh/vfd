@@ -160,14 +160,14 @@ NTSTATUS MntUninitializeMountMgr(
 		while (Node != NULL)
 		{
 			Temp = Node->Blink;
-			_MntUnmountDisk(CONTAINING_RECORD(Node,VDISK_LIST_ENTRY,Entry)->VDisk);
+			_MntUnmountDisk(CONTAINING_RECORD(Node,VDISK_LIST_ENTRY,Entry)->VDisk); //TODO: Check for success
 			Node = Temp;
 		}
 	}
 
 	MntReleaseGeneralLock();
 
-	return STATUS_UNSUCCESSFUL;
+	return STATUS_SUCCESS;
 }
 
 

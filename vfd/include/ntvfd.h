@@ -26,7 +26,16 @@
 	} \
 } \
 
-
+#define NtGetOsVersion(Major,Minor) \
+{ \
+	RTL_OSVERSIONINFOEXW OsInfo; \
+	OsInfo.dwOSVersionInfoSize = sizeof(RTL_OSVERSIONINFOEXW); \
+	if (NT_SUCCESS(RtlGetVersion((PRTL_OSVERSIONINFOW)&OsInfo))) \
+	{ \
+		*Major = OsInfo.dwMajorVersion; \
+		*Minor = OsInfo.dwMinorVersion; \
+	} \
+} \
 
 typedef struct _DEVICE_EXTENSION_DATA
 {

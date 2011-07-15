@@ -24,6 +24,7 @@ extern VFDINTERNAL NTSTATUS VdisGetIoParametersFromIrp(
 	)
 {
 	PIO_STACK_LOCATION IoStack = NULL;
+
 	struct 
 	{
 		ULONG Length;

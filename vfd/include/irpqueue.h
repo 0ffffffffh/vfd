@@ -2,10 +2,14 @@
 #define __IRPQUEUE_H__
 
 #include "ntvfd.h"
+#include "idw.h"
+
 
 #define IqGetIrpQueueCount(IrpQueue) ((IrpQueue)->Count)
 
 #define IqIsIrpQueueEmpty(IrpQueue) (((IrpQueue)->Count) == 0)
+
+#define IqCancelWait(IrpQueue) KeSetEvent(&(IrpQueue)->CancelEvent,IO_NO_INCREMENT,FALSE)
 
 typedef struct _IRPQUEUE_NODE
 {
@@ -19,7 +23,10 @@ typedef struct _IRPQUEUE
 	PIRPQUEUE_NODE Last;
 	ULONG Count;
 	KEVENT NotEmptyEvent;
+	KEVENT CancelEvent;
+	IRP_QUEUE_WORKER QueueWorker;
 }IRPQUEUE,*PIRPQUEUE;
+
 
 VOID IqInitializeIrpQueue(
 	__in PIRPQUEUE Queue
@@ -46,10 +53,8 @@ BOOLEAN IqDequeueIrp(
 	);
 
 
-
 NTSTATUS IqWaitUntilQueueIsNotEmpty(
 	__in PIRPQUEUE Queue
 	);
-
 
 #endif //__IRPQUEUE_H__

@@ -42,6 +42,8 @@ VFDINTERNAL NTSTATUS VdiAllocateVDiskItem(
 	if (!NT_SUCCESS(MemAllocateNonPagedPool(sizeof(VDISK_OBJECT),&disk)))
 		return STATUS_INSUFFICIENT_RESOURCES;
 
+	RtlZeroMemory(disk,sizeof(VDISK_OBJECT));
+
 	*VdiskObj = disk;
 
 	return STATUS_SUCCESS;
@@ -67,43 +69,77 @@ VFDINTERNAL NTSTATUS VdiHandleVdiskDeviceDevIo(
 {
 	ULONG CtlCode = VdiGetIoCtlCodeFromIoParam(IoParam);
 	ULONG OutBuffSize = 0,InpBuffSize=0;
-	NTSTATUS Status;
-
-	Status = STATUS_SUCCESS;
+	NTSTATUS Status = STATUS_UNSUCCESSFUL;
+	ULONG Info = 0;
 
 	switch (CtlCode)
 	{
 	case IOCTL_DISK_IS_WRITABLE:
-		{
-			IrpStatus->Status = STATUS_SUCCESS;
-			IrpStatus->Information = 0;
-		}
+		Status = STATUS_SUCCESS;
 		break;
 	case IOCTL_DISK_CHECK_VERIFY:
 	case IOCTL_STORAGE_CHECK_VERIFY:
 	case IOCTL_STORAGE_CHECK_VERIFY2:
-		{
-		}
+		Status = STATUS_SUCCESS;
 		break;
 	case IOCTL_DISK_GET_DRIVE_GEOMETRY:
 		{
-			if (!NT_SUCCESS(VdisCheckBufferSize(OutBuffSize,sizeof(DISK_GEOMETRY),IrpStatus)))
+			KdbPrint("Requested disk geometry for disk#%d",DiskObj->DeviceId);
+
+			if (!NT_SUCCESS(Status = VdisCheckBufferSize(OutBuffSize,sizeof(DISK_GEOMETRY),IrpStatus)))
 				break;
 		}
 		break;
 	case IOCTL_DISK_GET_LENGTH_INFO:
 		{
+			PGET_LENGTH_INFORMATION Li;
+
+			KdbPrint("Requested length info for disk#%d",DiskObj->DeviceId);
+
+			if (!NT_SUCCESS(Status = VdisCheckBufferSize(OutBuffSize,sizeof(GET_LENGTH_INFORMATION),IrpStatus)))
+				break;
+
+			Li = (PGET_LENGTH_INFORMATION)IoParam->IoBuffer;
+
+			Li->Length.QuadPart = DiskObj->VdevSize;
+
+			Status = STATUS_SUCCESS;
+			Info = sizeof(GET_LENGTH_INFORMATION);
 		}
 		break;
 	case IOCTL_DISK_GET_DRIVE_LAYOUT:
 		{
-			if (!NT_SUCCESS(VdisCheckBufferSize(OutBuffSize,sizeof(DRIVE_LAYOUT_INFORMATION),IrpStatus)))
+			PDRIVE_LAYOUT_INFORMATION Dli;
+
+			KdbPrint("Requested disk partition info for disk%d",DiskObj->DeviceId);
+
+			if (!NT_SUCCESS(Status = VdisCheckBufferSize(OutBuffSize,sizeof(DRIVE_LAYOUT_INFORMATION),IrpStatus)))
 				break;
 
+			Dli = (PDRIVE_LAYOUT_INFORMATION)IoParam->IoBuffer;
 
+			Dli->PartitionCount = 1;
+			Dli->Signature = 0xD1;
+			
+			Dli->PartitionEntry->BootIndicator = FALSE;
+			Dli->PartitionEntry->HiddenSectors = 0; //FIX IT LATER
+			Dli->PartitionEntry->PartitionLength.QuadPart = DiskObj->VdevSize;
+			Dli->PartitionEntry->PartitionNumber = 1;
+			Dli->PartitionEntry->PartitionType = PARTITION_ENTRY_UNUSED;
+			Dli->PartitionEntry->RecognizedPartition = TRUE;
+			Dli->PartitionEntry->RewritePartition = FALSE;
+			Dli->PartitionEntry->StartingOffset.QuadPart = 0L;
+
+			Info = sizeof(PARTITION_INFORMATION);
+			Status = STATUS_SUCCESS;
 		}
 		break;
+	default:
+		KdbPrint("Unsupported disk ctl request (%x) for disk#%d",CtlCode,DiskObj->DeviceId);
 	}
+
+	IrpStatus->Status = Status;
+	IrpStatus->Information = Info;
 
 	return Status;
 }
@@ -204,6 +240,7 @@ NTSTATUS VdiAllocateVirtualDisk(
 
 	if (!NT_SUCCESS(Status))
 	{
+		IoDeleteDevice(DevObj);
 		NTFAILMSG(Status);
 		return Status;
 	}

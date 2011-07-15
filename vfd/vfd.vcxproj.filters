@@ -36,6 +36,9 @@
     <ClCompile Include="vdisk\vdisup.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="khelper\idw.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\mntmgr.h">
@@ -54,6 +57,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\vdskntrnl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\idw.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

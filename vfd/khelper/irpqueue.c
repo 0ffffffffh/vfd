@@ -1,6 +1,9 @@
 #include "..\include\irpqueue.h"
 #include "..\include\memory.h"
 
+#define IqNotEmptyEvent 0
+#define IqCancellationEvent 1
+
 VOID IqInitializeIrpQueue(
 	__in PIRPQUEUE Queue
 	)
@@ -8,6 +11,7 @@ VOID IqInitializeIrpQueue(
 	ASSERT(Queue != NULL);
 
 	KeInitializeEvent(&Queue->NotEmptyEvent,NotificationEvent,FALSE);
+	KeInitializeEvent(&Queue->CancelEvent,NotificationEvent,FALSE);
 	Queue->First = Queue->Last = NULL;
 }
 
@@ -39,6 +43,8 @@ BOOLEAN IqEnqueueIrp(
 	PIRPQUEUE_NODE NewNode = NULL;
 
 	Status = MemAllocateNonPagedPool(sizeof(IRPQUEUE_NODE),&NewNode);
+
+	RtlZeroMemory(NewNode,sizeof(IRPQUEUE_NODE));
 
 	if (!NT_SUCCESS(Status))
 	{
@@ -101,5 +107,26 @@ NTSTATUS IqWaitUntilQueueIsNotEmpty(
 	__in PIRPQUEUE Queue
 	)
 {
-	return KeWaitForSingleObject(&Queue->NotEmptyEvent,Executive,KernelMode,FALSE,NULL);
+	NTSTATUS Status;
+
+	PVOID Events[2] =
+	{
+		&Queue->NotEmptyEvent,
+		&Queue->CancelEvent
+	};
+
+
+	Status = KeWaitForMultipleObjects(2,Events,WaitAny,Executive,KernelMode,FALSE,NULL,0);
+
+	switch (Status)
+	{
+	case IqNotEmptyEvent:
+		KdbPrint(__FUNCTION__ ": An IRP enqueued");
+		break;
+	case IqCancellationEvent:
+		KdbPrint(__FUNCTION__ ": Signalled cancellation event");
+		break;
+	}
+
+	return Status;
 }
