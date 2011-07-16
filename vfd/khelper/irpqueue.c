@@ -1,5 +1,6 @@
 #include "..\include\irpqueue.h"
 #include "..\include\memory.h"
+#include "..\include\lock.h"
 
 #define IqNotEmptyEvent 0
 #define IqCancellationEvent 1
@@ -10,6 +11,7 @@ VOID IqInitializeIrpQueue(
 {
 	ASSERT(Queue != NULL);
 
+	KeInitializeMutex(&Queue->Lock,0);
 	KeInitializeEvent(&Queue->NotEmptyEvent,NotificationEvent,FALSE);
 	KeInitializeEvent(&Queue->CancelEvent,NotificationEvent,FALSE);
 	Queue->First = Queue->Last = NULL;
@@ -20,8 +22,15 @@ BOOLEAN IqInterlockedEnqueueIrp(
 	__in PIRP Irp
 	)
 {
-	NOTIMPLEMENTED();
-	return FALSE;
+	BOOLEAN Result;
+
+	KeAcquireMutexLock(&Queue->Lock);
+
+	Result = IqEnqueueIrp(Queue,Irp);
+
+	KeReleaseMutexLock(&Queue->Lock);
+
+	return Result;
 }
 
 BOOLEAN IqInterlockedDequeueIrp(
@@ -29,8 +38,15 @@ BOOLEAN IqInterlockedDequeueIrp(
 	__out PIRP *Irp
 	)
 {
-	NOTIMPLEMENTED();
-	return FALSE;
+	BOOLEAN Result;
+
+	KeAcquireMutexLock(&Queue->Lock);
+
+	Result = IqDequeueIrp(Queue,Irp);
+
+	KeReleaseMutexLock(&Queue->Lock);
+
+	return Result;
 }
 
 BOOLEAN IqEnqueueIrp(

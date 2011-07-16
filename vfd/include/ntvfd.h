@@ -37,6 +37,7 @@
 	} \
 } \
 
+
 typedef struct _DEVICE_EXTENSION_DATA
 {
 	ULONG DeviceId;

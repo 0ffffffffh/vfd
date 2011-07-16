@@ -114,6 +114,7 @@
   <ItemGroup>
     <ClInclude Include="include\idw.h" />
     <ClInclude Include="include\irpqueue.h" />
+    <ClInclude Include="include\lock.h" />
     <ClInclude Include="include\memory.h" />
     <ClInclude Include="include\mntmgr.h" />
     <ClInclude Include="include\ntvfd.h" />

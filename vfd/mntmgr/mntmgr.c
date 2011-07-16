@@ -1,6 +1,7 @@
 #include "..\include\mntmgr.h"
 #include "..\include\vdisk.h"
 #include "..\include\memory.h"
+#include "..\include\lock.h"
 
 KMUTEX MntGeneralMountLock;
 PDRIVER_OBJECT MntDriverObject;
@@ -13,16 +14,15 @@ typedef struct _VDISK_LIST_ENTRY
 	PVDISK_OBJECT VDisk;
 }VDISK_LIST_ENTRY,*PVDISK_LIST_ENTRY;
 
+#define MntAcquireGeneralLock() KeAcquireMutexLock(&MntGeneralMountLock)
 
-
-#define MntAcquireGeneralLock() KeWaitForSingleObject(&MntGeneralMountLock,Executive,KernelMode,FALSE,NULL)
-
-#define MntReleaseGeneralLock() KeReleaseMutex(&MntGeneralMountLock,FALSE)
+#define MntReleaseGeneralLock() KeReleaseMutexLock(&MntGeneralMountLock)
 
 #define MntIsRegistered(Vdisk) \
 { \
 	((BOOLEAN)Vdisk->ContainedNode != NULL); \
 } \
+
 
 
 VFDINTERNAL VOID MntRegisterDiskDeviceObject(

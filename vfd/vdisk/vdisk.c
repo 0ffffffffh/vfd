@@ -15,6 +15,15 @@
 
 //FORWARDED ROUTINES BEGIN
 
+VFDINTERNAL NTSTATUS IdwCreateDispatcherThread(
+	__in PIRPQUEUE Queue,
+	__in IRPQUEUE_COMPLETION_ROUTINE CompletionCb
+	);
+
+VFDINTERNAL NTSTATUS IdwTerminateDispatcherThread(
+	__in PIRPQUEUE Queue
+	);
+
 VFDINTERNAL FORCEINLINE NTSTATUS VdisCheckBufferSize(
 	__in ULONG IncomingSize,
 	__in ULONG Required,
@@ -194,7 +203,7 @@ VFDINTERNAL VOID VdiCompleteAllPendingIrps(
 	if (IqIsIrpQueueEmpty(&Vdisk->VdevIrpQueue))
 		return;
 
-	while (IqDequeueIrp(&Vdisk->VdevIrpQueue,&PendingIrp))
+	while (IqInterlockedDequeueIrp(&Vdisk->VdevIrpQueue,&PendingIrp))
 	{
 		PendingIrp->IoStatus.Status = STATUS_SUCCESS;
 		PendingIrp->IoStatus.Information = 0;
@@ -251,6 +260,9 @@ NTSTATUS VdiAllocateVirtualDisk(
 
 	*DiskObj = NewDiskObj;
 
+	//TODO: FIX ME
+	IdwCreateDispatcherThread(&NewDiskObj->VdevIrpQueue,NULL);
+
 	DevObj->Flags |= DO_DIRECT_IO;
 	DevObj->Flags &= ~DO_DEVICE_INITIALIZING;
 
@@ -262,6 +274,7 @@ NTSTATUS VdiFreeVirtualDisk(
 	)
 {
 	VdiCompleteAllPendingIrps(DiskObj);
+	IdwTerminateDispatcherThread(&DiskObj->VdevIrpQueue);
 	IoDeleteDevice(DiskObj->VdevOb);
 	return VdiFreeVDiskItem(DiskObj);
 }
@@ -283,7 +296,7 @@ NTSTATUS VdiDispatchDiskIrp(
 	if (IoParam.Major)
 	{
 		IoMarkIrpPending(Irp);
-		IqEnqueueIrp(&DiskObj->VdevIrpQueue,Irp);
+		IqInterlockedEnqueueIrp(&DiskObj->VdevIrpQueue,Irp);
 		return STATUS_PENDING;
 	}
 

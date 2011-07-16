@@ -33,7 +33,7 @@ VOID IdwiWorkerRoutine(
 }
 
 
-extern NTSTATUS IdwCreateDispatcherThread(
+extern VFDINTERNAL NTSTATUS IdwCreateDispatcherThread(
 	__in PIRPQUEUE Queue,
 	__in IRPQUEUE_COMPLETION_ROUTINE CompletionCb
 	)
@@ -66,25 +66,16 @@ extern NTSTATUS IdwCreateDispatcherThread(
 	return STATUS_SUCCESS;
 }
 
-extern NTSTATUS IdwTerminateDispatcherThread(
+extern VFDINTERNAL NTSTATUS IdwTerminateDispatcherThread(
 	__in PIRPQUEUE Queue
 	)
 {
-	ULONG Major=0,Minor=0;
-	BOOLEAN VistaAndLater=FALSE;
-
-	NtGetOsVersion(&Major,&Minor);
-
-	VistaAndLater = ((Major >= 6 && Minor >= 0));
-
 	InterlockedCompareExchange((volatile LONG *)&Queue->QueueWorker.WorkState,0,1);
 	IqCancelWait(Queue);
 
-	
 	KeWaitForSingleObject(Queue->QueueWorker.Worker,Executive,KernelMode,FALSE,NULL);
 
-	if (VistaAndLater)
-		ZwClose(Queue->QueueWorker.Worker);
+	ZwClose(Queue->QueueWorker.Worker);
 
 	return STATUS_SUCCESS;
 }

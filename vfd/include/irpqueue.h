@@ -24,6 +24,7 @@ typedef struct _IRPQUEUE
 	ULONG Count;
 	KEVENT NotEmptyEvent;
 	KEVENT CancelEvent;
+	KMUTEX Lock;
 	IRP_QUEUE_WORKER QueueWorker;
 }IRPQUEUE,*PIRPQUEUE;
 
