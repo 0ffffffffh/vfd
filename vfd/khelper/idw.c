@@ -4,7 +4,7 @@
 #include "..\include\irpqueue.h"
 #include "..\include\idw.h"
 
-VOID IdwiWorkerRoutine(
+VOID NTAPI IdwiWorkerRoutine(
 	__in PVOID Context
 	)
 {
@@ -58,7 +58,7 @@ extern VFDINTERNAL NTSTATUS IdwCreateDispatcherThread(
 
 	if (!NT_SUCCESS(Status))
 	{
-		InterlockedExchange((volatile LONG *)Queue->QueueWorker.WorkState,0L);
+		InterlockedExchange((volatile LONG *)&Queue->QueueWorker.WorkState,0L);
 		NTFAILMSGEX(Status,"System dispatcher thread could not created");
 		return Status;
 	}

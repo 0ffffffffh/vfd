@@ -3,6 +3,8 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vfd", "vfd\vfd.vcxproj", "{BBCC6E2D-2E8F-490D-9A6E-741E00D4B618}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vfdctrllib", "vfdctrllib\vfdctrllib.vcxproj", "{87649936-D42E-4C69-B817-52C05CF3D479}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -13,6 +15,10 @@ Global
 		{BBCC6E2D-2E8F-490D-9A6E-741E00D4B618}.Debug|Win32.Build.0 = Debug|Win32
 		{BBCC6E2D-2E8F-490D-9A6E-741E00D4B618}.Release|Win32.ActiveCfg = Release|Win32
 		{BBCC6E2D-2E8F-490D-9A6E-741E00D4B618}.Release|Win32.Build.0 = Release|Win32
+		{87649936-D42E-4C69-B817-52C05CF3D479}.Debug|Win32.ActiveCfg = Debug|Win32
+		{87649936-D42E-4C69-B817-52C05CF3D479}.Debug|Win32.Build.0 = Debug|Win32
+		{87649936-D42E-4C69-B817-52C05CF3D479}.Release|Win32.ActiveCfg = Release|Win32
+		{87649936-D42E-4C69-B817-52C05CF3D479}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
